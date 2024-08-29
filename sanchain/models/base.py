@@ -22,8 +22,8 @@ class AbstractBroadcastModel(ABC):
             }
         """
 
-    @abstractmethod
     @classmethod
+    @abstractmethod
     def from_json(self):
         """Create a model from a JSON serializable dictionary.
            Format:
@@ -39,8 +39,8 @@ class AbstractBroadcastModel(ABC):
 class AbstractDatabaseModel(ABC):
     """A model that can be stored in the database."""
 
-    @abstractmethod
     @property
+    @abstractmethod
     def db_columns(self):
         """The columns of the model in the database. Along with their types.
         Allowed types: 'TEXT', 'INTEGER', 'REAL', 'BLOB'
@@ -66,8 +66,8 @@ class AbstractDatabaseModel(ABC):
             )
         """
 
-    @abstractmethod
     @classmethod
+    @abstractmethod
     def from_db_row(cls, row):
         """Create a model from a tuple retrieved from a database."""
         pass
