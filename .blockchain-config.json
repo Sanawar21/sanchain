@@ -1,1 +1,8 @@
-{"type": "BlockChainConfig", "difficulty": 4, "reward": 50}
+{
+  "type": "BlockChainConfig",
+  "difficulty": 4,
+  "reward": 100,
+  "block_UTXO_usage_limit": 10,
+  "miner_fees": 0.01,
+  "block_height_limit": 1000
+}

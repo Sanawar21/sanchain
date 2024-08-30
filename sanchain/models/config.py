@@ -6,9 +6,16 @@ from .base import AbstractBroadcastModel
 class BlockChainConfig(AbstractBroadcastModel):
     PATH = pathlib.Path('.blockchain-config.json')
 
-    def __init__(self, difficulty: int, reward: float) -> None:
+    def __init__(self, difficulty: int, reward: float, block_UTXO_usage_limit: int, miner_fees: float, block_height_limit: int) -> None:
         self.difficulty = difficulty
         self.reward = reward
+        self.block_UTXO_usage_limit = block_UTXO_usage_limit
+        self.miner_fees = miner_fees
+        self.block_height_limit = block_height_limit
+
+    @classmethod
+    def default(cls):
+        return cls(4, 100.0, 10, 0.01, 1000)
 
     @classmethod
     def load_local(cls):
@@ -17,7 +24,7 @@ class BlockChainConfig(AbstractBroadcastModel):
                 return cls.from_json(json.loads(file.read()))
         else:
             # TODO: Get config from network
-            return cls(4, 50.0)
+            return cls.default()
 
     def update_local(self):
         with open(self.PATH, 'w') as file:
@@ -27,12 +34,18 @@ class BlockChainConfig(AbstractBroadcastModel):
         return {
             'type': self.model_type,
             'difficulty': self.difficulty,
-            'reward': self.reward
+            'reward': self.reward,
+            'block_UTXO_usage_limit': self.block_UTXO_usage_limit,
+            'miner_fees': self.miner_fees,
+            'block_height_limit': self.block_height_limit,
         }
 
     @classmethod
     def from_json(cls, json_data):
         return cls(
             json_data['difficulty'],
-            json_data['reward']
+            json_data['reward'],
+            json_data['block_UTXO_usage_limit'],
+            json_data['miner_fees'],
+            json_data['block_height_limit']
         )
