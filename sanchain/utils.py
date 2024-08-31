@@ -11,8 +11,10 @@ class UIDGenerator:
 
     def get(self):
         while True:
-            uid = int(str(int(time.time_ns() / 1_000_000)) +
-                      str(random.randint(100, 1_000)))
+            uid = int(
+                str(int(time.time())) +
+                str(random.randint(100, 1000))
+            )
             if uid != self.last_uid:
                 self.last_uid = uid
                 return uid

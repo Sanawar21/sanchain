@@ -5,7 +5,7 @@ from ..utils import generate_uid
 
 
 class UTXO(AbstractDatabaseModel, AbstractBroadcastModel):
-    def __init__(self, uid: int, verification_key: bytes, value: float, index: int, transaction_hash: bytes, block_index: int) -> None:
+    def __init__(self, uid: int, verification_key: bytes, value: float, index: int, transaction_hash: bytes, block_index: int,  spender_transaction_uid: int) -> None:
         self.uid = uid
         # hash of the owner public key
         self.verification_key = verification_key
@@ -13,10 +13,11 @@ class UTXO(AbstractDatabaseModel, AbstractBroadcastModel):
         self.index = index
         self.transaction_hash = transaction_hash
         self.block_index = block_index
+        self.spender_transaction_uid = spender_transaction_uid
 
     @classmethod
     def nascent(cls, verification_key: bytes, value: float, index: int):
-        return cls(generate_uid(), verification_key, value, index, b'', -1)
+        return cls(generate_uid(), verification_key, value, index, b'', -1, -1)
 
     @classmethod
     def from_json(cls, data):
@@ -26,7 +27,8 @@ class UTXO(AbstractDatabaseModel, AbstractBroadcastModel):
             data['value'],
             data['index'],
             base64.b64decode(data['transaction_hash']),
-            data['block_index']
+            data['block_index'],
+            data['spender_transaction_uid'],
         )
 
     def to_json(self):
@@ -37,7 +39,8 @@ class UTXO(AbstractDatabaseModel, AbstractBroadcastModel):
             'value': self.value,
             'index': self.index,
             'transaction_hash': base64.b64encode(self.transaction_hash).decode(),
-            'block_index': self.block_index
+            'block_index': self.block_index,
+            'spender_transaction_uid': self.spender_transaction_uid,
         }
 
     @property
@@ -48,17 +51,19 @@ class UTXO(AbstractDatabaseModel, AbstractBroadcastModel):
             ('value', 'REAL'),
             ('index', 'INTEGER'),
             ('transaction_hash', 'BLOB'),
-            ('block_index', 'INTEGER')
+            ('block_index', 'INTEGER'),
+            ('spender_transaction_uid', 'INTEGER'),
         ]
 
-    def as_db_row(self):
+    def to_db_row(self):
         return (
             self.uid,
             self.verification_key,
             self.value,
             self.index,
             self.transaction_hash,
-            self.block_index
+            self.block_index,
+            self.spender_transaction_uid,
         )
 
     @classmethod
