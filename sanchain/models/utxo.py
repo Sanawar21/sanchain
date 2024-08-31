@@ -1,49 +1,66 @@
-import rsa
-import json
 import base64
 
-from .base import AbstractBroadcastModel, AbstractDatabaseModel
+from .base import AbstractDatabaseModel, AbstractBroadcastModel
+from ..utils import generate_uid
 
 
 class UTXO(AbstractDatabaseModel, AbstractBroadcastModel):
-    def __init__(self, verification_key: bytes, value, index: int, transaction_hash: bytes) -> None:
+    def __init__(self, uid: int, verification_key: bytes, value: float, index: int, transaction_hash: bytes, block_index: int) -> None:
+        self.uid = uid
         # hash of the owner public key
         self.verification_key = verification_key
         self.value = value
         self.index = index
         self.transaction_hash = transaction_hash
+        self.block_index = block_index
 
-    def sign(self, private_key: rsa.PrivateKey):
-        self.signature = rsa.sign(json.dumps(
-            self.to_json()).encode(), private_key, 'SHA-256')
+    @classmethod
+    def nascent(cls, verification_key: bytes, value: float, index: int):
+        return cls(generate_uid(), verification_key, value, index, b'', -1)
 
-    def verify(self, pubkey: rsa.PublicKey) -> bool:
-        pubkey_hash = rsa.compute_hash(pubkey.save_pkcs1('DER'), 'SHA-256')
-        if pubkey_hash != self.verification_key:
-            return False
-
-        try:
-            rsa.verify(json.dumps(self.to_json()).encode(),
-                       self.signature, pubkey)
-        except rsa.VerificationError:
-            return False
-        else:
-            return True
+    @classmethod
+    def from_json(cls, data):
+        return cls(
+            data['uid'],
+            base64.b64decode(data['verification_key']),
+            data['value'],
+            data['index'],
+            base64.b64decode(data['transaction_hash']),
+            data['block_index']
+        )
 
     def to_json(self):
         return {
+            'type': self.model_type,
+            'uid': self.uid,
             'verification_key': base64.b64encode(self.verification_key).decode(),
             'value': self.value,
             'index': self.index,
             'transaction_hash': base64.b64encode(self.transaction_hash).decode(),
+            'block_index': self.block_index
         }
 
-    @classmethod
-    def from_json(cls, json_data):
-        return cls(
-            base64.b64decode(json_data['verification_key']),
-            json_data['value'],
-            json_data['index'],
-            base64.b64decode(json_data['transaction_hash']),
+    @property
+    def db_columns(self):
+        return [
+            ('uid', 'INTEGER PRIMARY KEY'),
+            ('verification_key', 'BLOB'),
+            ('value', 'REAL'),
+            ('index', 'INTEGER'),
+            ('transaction_hash', 'BLOB'),
+            ('block_index', 'INTEGER')
+        ]
+
+    def as_db_row(self):
+        return (
+            self.uid,
+            self.verification_key,
+            self.value,
+            self.index,
+            self.transaction_hash,
+            self.block_index
         )
-    # TODO: Figure out storing these in database, sharing of unsigned UTXOs, and broadcasting of signed UTXOs
+
+    @classmethod
+    def from_db_row(cls, row):
+        return cls(*row)

@@ -3,8 +3,8 @@ import json
 from .base import AbstractBroadcastModel
 
 
-class BlockChainConfig(AbstractBroadcastModel):
-    PATH = pathlib.Path('.blockchain-config.json')
+class SanchainConfig(AbstractBroadcastModel):
+    PATH = pathlib.Path('.Sanchain-config.json')
 
     def __init__(self, difficulty: int, reward: float, block_UTXO_usage_limit: int, miner_fees: float, block_height_limit: int) -> None:
         self.difficulty = difficulty

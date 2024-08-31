@@ -1,5 +1,5 @@
 {
-  "type": "BlockChainConfig",
+  "type": "SanchainConfig",
   "difficulty": 4,
   "reward": 100,
   "block_UTXO_usage_limit": 10,
