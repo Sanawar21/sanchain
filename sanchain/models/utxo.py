@@ -16,8 +16,8 @@ class UTXO(AbstractDatabaseModel, AbstractBroadcastModel):
         self.spender_transaction_uid = spender_transaction_uid
 
     @classmethod
-    def nascent(cls, verification_key: bytes, value: float, index: int):
-        return cls(generate_uid(), verification_key, value, index, b'', -1, -1)
+    def nascent(cls, verification_key: bytes, value: float, index: int, block_index: int):
+        return cls(generate_uid(), verification_key, value, index, b'', block_index, -1)
 
     @classmethod
     def from_json(cls, data):

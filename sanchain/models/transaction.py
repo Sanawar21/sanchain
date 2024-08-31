@@ -16,7 +16,7 @@ class Transaction(AbstractBroadcastModel, AbstractDatabaseModel):
     A verified transaction will be hashed and new UTXOs will be generated.
     """
 
-    def __init__(self, uid: int, sender: rsa.PublicKey, receiver: rsa.PublicKey, amount: float, utxos: list[UTXO], signature: bytes, nascent_utxos: list[UTXO], hash: bytes) -> None:
+    def __init__(self, uid: int, sender: rsa.PublicKey, receiver: rsa.PublicKey, amount: float, utxos: list[UTXO], signature: bytes, nascent_utxos: list[UTXO], hash: bytes, block_index: int) -> None:
         self.uid = uid
         self.sender = sender
         self.receiver = receiver
@@ -26,6 +26,9 @@ class Transaction(AbstractBroadcastModel, AbstractDatabaseModel):
 
         self.nascent_utxos = nascent_utxos
         self.hash = hash
+
+        self.block_index = block_index
+
         self.__is_verified = False
 
     @property
@@ -37,11 +40,12 @@ class Transaction(AbstractBroadcastModel, AbstractDatabaseModel):
             ('amount', 'REAL'),
             ('signature', 'BLOB'),
             ('hash', 'BLOB'),
+            ('block_index', 'INTEGER'),
         ]
 
     @classmethod
     def unsigned(cls, sender: rsa.PublicKey, receiver: rsa.PublicKey, amount: float, utxos: list[UTXO]):
-        return cls(generate_uid(), sender, receiver, amount, utxos, b'', [], b'')
+        return cls(generate_uid(), sender, receiver, amount, utxos, b'', [], b'', -1)
 
     @classmethod
     def from_db_row(cls, row):
@@ -54,6 +58,7 @@ class Transaction(AbstractBroadcastModel, AbstractDatabaseModel):
             row[4],
             [],  # use hash to fetch the UTXOs from the database
             row[5],
+            row[6],
         )
         # TODO: fetch the UTXOs from the database
         return obj
@@ -71,6 +76,7 @@ class Transaction(AbstractBroadcastModel, AbstractDatabaseModel):
             base64.b64decode(json_data['signature']),
             [UTXO.from_json(utxo) for utxo in json_data['nascent_utxos']],
             base64.b64decode(json_data['hash']),
+            json_data['block_index'],
         )
 
     def to_db_row(self):
@@ -81,6 +87,7 @@ class Transaction(AbstractBroadcastModel, AbstractDatabaseModel):
             self.amount,
             self.signature,
             self.hash,
+            self.block_index,
         )
 
     def to_json(self):
@@ -94,6 +101,7 @@ class Transaction(AbstractBroadcastModel, AbstractDatabaseModel):
             'utxos': [utxo.to_json() for utxo in self.utxos],
             'nascent_utxos': [utxo.to_json() for utxo in self.nascent_utxos],
             'hash': base64.b64encode(self.hash).decode(),
+            'block_index': self.block_index,
         }
 
     def sign(self, private_key: rsa.PrivateKey):
@@ -106,6 +114,7 @@ class Transaction(AbstractBroadcastModel, AbstractDatabaseModel):
         del data['signature']
         del data['nascent_utxos']
         del data['hash']
+        del data['block_index']
 
         self.signature = rsa.sign(
             json.dumps(data).encode(),
@@ -113,7 +122,7 @@ class Transaction(AbstractBroadcastModel, AbstractDatabaseModel):
             'SHA-256'
         )
 
-    def verify_signature(self):
+    def verify(self):
         """Verify the transaction and its utxos."""
         try:
             # verify the transaction itself
@@ -123,6 +132,7 @@ class Transaction(AbstractBroadcastModel, AbstractDatabaseModel):
             del data['signature']
             del data['nascent_utxos']
             del data['hash']
+            del data['block_index']
 
             rsa.verify(
                 data.encode(),
@@ -154,16 +164,20 @@ class Transaction(AbstractBroadcastModel, AbstractDatabaseModel):
         """
         assert self.__is_verified
 
+        self.block_index = CONFIG.last_block_index + 1
+
         self.nascent_utxos = [
-            UTXO.nascent(  # receiver's utxo
-                rsa.compute_hash(self.receiver, "SHA-256"),
-                self.amount,
-                0
-            ),
             UTXO.nascent(  # miner's fees
                 rsa.compute_hash(miner, "SHA-256"),
                 self.amount * CONFIG.miner_fee,
-                1
+                0,
+                self.block_index,
+            ),
+            UTXO.nascent(  # receiver's utxo
+                rsa.compute_hash(self.receiver, "SHA-256"),
+                self.amount,
+                1,
+                self.block_index,
             ),
         ]
 
@@ -175,7 +189,8 @@ class Transaction(AbstractBroadcastModel, AbstractDatabaseModel):
                 UTXO.nascent(
                     rsa.compute_hash(self.sender, "SHA-256"),
                     change,
-                    2
+                    2,
+                    self.block_index,
                 )
             )
 

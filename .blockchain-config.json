@@ -1,8 +1,12 @@
 {
   "type": "SanchainConfig",
+  "version": 1,
   "difficulty": 4,
   "reward": 100,
   "block_UTXO_usage_limit": 10,
   "miner_fees": 0.01,
-  "block_height_limit": 1000
+  "block_height_limit": 1000,
+  "last_block_index": -1,
+  "last_block_hash": "",
+  "circulation": 0.0
 }
