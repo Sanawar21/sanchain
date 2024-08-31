@@ -1,7 +1,7 @@
 import json
 from ..models.transaction import Transaction
 from ..models.block import Block
-from ..utils import BlockChainConfig
+from ..utils import SanchainConfig
 
 
 class MessageHandler:
@@ -14,5 +14,5 @@ class MessageHandler:
         return json.dumps(block.to_json())
 
     @staticmethod
-    def revert(message: str) -> Transaction | Block | BlockChainConfig:
+    def revert(message: str) -> Transaction | Block | SanchainConfig:
         return Transaction.from_json(json.loads(message))
