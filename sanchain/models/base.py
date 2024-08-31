@@ -54,7 +54,7 @@ class AbstractDatabaseModel(ABC):
         return []
 
     @abstractmethod
-    def as_db_row(self):
+    def to_db_row(self):
         """Convert the model to a tuple that will be written to a database.
           The order of the values should match the order of the columns in db_columns.
           Allowed data types: bytes, str, int, float, bool, None
