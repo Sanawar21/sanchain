@@ -1,7 +1,7 @@
 import time
 import random
 
-from models.config import SanchainConfig
+from .config import SanchainConfig
 
 CONFIG = SanchainConfig.load_local()
 

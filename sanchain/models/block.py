@@ -1,10 +1,10 @@
 import rsa
 import time
 import random
-import base64
 import json
+import base64
 
-from .config import SanchainConfig
+from ..config import SanchainConfig
 from ..utils import CONFIG
 from .transaction import Transaction, BlockReward
 from ..base import AbstractSanchainModel
@@ -15,23 +15,42 @@ class Block(AbstractSanchainModel):
     Use Block.new() to create a new block for mining.
     """
 
-    def __init__(self, index: int, timestamp: int, merkle_root: bytes, config: SanchainConfig, transactions: list[Transaction], hash: bytes, nonce: int) -> None:
-        self.index = index
+    db_columns = [
+        ('idx', 'INTEGER PRIMARY KEY'),
+        ('timestamp', 'INTEGER'),
+        ('merkle_root', 'BLOB'),
+        ('hash', 'BLOB'),
+        ('nonce', 'INTEGER'),
+        # add config data
+        ('version', 'INTEGER'),
+        ('difficulty', 'INTEGER'),
+        ('reward', 'REAL'),
+        ('block_UTXO_usage_limit', 'INTEGER'),
+        ('miner_fees', 'REAL'),
+        ('block_height_limit', 'INTEGER'),
+        ('last_block_index', 'INTEGER'),
+        ('last_block_hash', 'BLOB'),
+        ('circulation', 'REAL'),
+    ]
+
+    def __init__(self, idx: int, timestamp: int, merkle_root: bytes, config: SanchainConfig, transactions: list[Transaction], hash: bytes, nonce: int) -> None:
+        self.idx = idx
         self.timestamp = timestamp
         self.merkle_root = merkle_root
         self.config = config
         self.transactions = transactions
         self.hash = hash
         self.nonce = nonce
+        self.invalid_transactions = []
 
     @classmethod
-    def new(cls):
+    def new(cls, transactions: list[Transaction]):
         return cls(
             CONFIG.last_block_index + 1,
             0,
             b'',
             CONFIG,
-            [],
+            transactions,
             b'',
             0,
         )
@@ -40,11 +59,11 @@ class Block(AbstractSanchainModel):
     def from_json(cls, json_data):
         return cls(
             json_data['timestamp'],
-            json_data['merkle_root'],
+            base64.b64decode(json_data['merkle_root'].encode()),
             SanchainConfig.from_json(json_data['config']),
             [Transaction.from_json(transaction)
              for transaction in json_data['transactions']],
-            json_data['hash'],
+            base64.b64decode(json_data['hash'].encode()),
             json_data['nonce'],
         )
 
@@ -71,32 +90,12 @@ class Block(AbstractSanchainModel):
 
         )
 
-    @property
-    def db_columns(self):
-        return [
-            ('index', 'INTEGER PRIMARY KEY'),
-            ('timestamp', 'INTEGER'),
-            ('merkle_root', 'BLOB'),
-            ('hash', 'BLOB'),
-            ('nonce', 'INTEGER'),
-            # add config data
-            ('version', 'INTEGER'),
-            ('difficulty', 'INTEGER'),
-            ('reward', 'REAL'),
-            ('block_UTXO_usage_limit', 'INTEGER'),
-            ('miner_fees', 'REAL'),
-            ('block_height_limit', 'INTEGER'),
-            ('last_block_index', 'INTEGER'),
-            ('last_block_hash', 'BLOB'),
-            ('circulation', 'REAL'),
-        ]
-
     def to_json(self):
         return {
-            'index': self.index,
+            'idx': self.idx,
             'timestamp': self.timestamp,
-            'merkle_root': self.merkle_root,
-            'hash': self.hash,
+            'merkle_root': base64.b64encode(self.merkle_root).decode(),
+            'hash': base64.b64encode(self.hash).decode(),
             'nonce': self.nonce,
             'transactions': [transaction.to_json() for transaction in self.transactions],
             'config': self.config.to_json(),
@@ -104,7 +103,7 @@ class Block(AbstractSanchainModel):
 
     def to_db_row(self):
         return (
-            self.index,
+            self.idx,
             self.timestamp,
             self.merkle_root,
             self.hash,
@@ -139,7 +138,7 @@ class Block(AbstractSanchainModel):
 
         return nodes[-1]
 
-    def __calculate_hash(self, nonce: int, block_data: bytes):
+    def __calculate_hash(self, block_data: bytes):
         nonce = random.randint(0, 99999999999999999)
         proof = b'0' * self.config.difficulty
         hash = b''
@@ -158,8 +157,10 @@ class Block(AbstractSanchainModel):
             if transaction.verify():
                 transaction.execute(miner)
             else:
-                # invalid transaction
-                pass  # TODO: remove from mempool so that it can't be mined again
+                self.invalid_transactions.append(transaction)
+
+        for transaction in self.invalid_transactions:
+            self.transactions.remove(transaction)
 
         self.transactions.append(BlockReward.new(miner))
 
@@ -173,7 +174,7 @@ class Block(AbstractSanchainModel):
         del block['nonce']
 
         block_data = json.dumps(block).encode()
-        hash, nonce = self.__calculate_hash(nonce, block_data)
+        hash, nonce = self.__calculate_hash(block_data)
 
         self.hash = hash
         self.nonce = nonce

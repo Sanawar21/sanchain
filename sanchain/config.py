@@ -1,12 +1,27 @@
 import pathlib
 import json
 import base64
-from ..base import AbstractSanchainModel
+import os
+
+from .base import AbstractSanchainModel
 
 
 class SanchainConfig(AbstractSanchainModel):
-    PATH = pathlib.Path('.Sanchain-config.json')
+    PATH = pathlib.Path(os.getcwd()) / '.Sanchain-config.json'
     REWARD_SENDER = 'SANCHAIN'
+    DB_FOLDER = pathlib.Path(os.getcwd()) / 'data'
+
+    db_columns = [
+        ('version', 'INTEGER PRIMARY KEY'),
+        ('difficulty', 'INTEGER'),
+        ('reward', 'REAL'),
+        ('block_UTXO_usage_limit', 'INTEGER'),
+        ('miner_fees', 'REAL'),
+        ('block_height_limit', 'INTEGER'),
+        ('last_block_index', 'INTEGER'),
+        ('last_block_hash', 'BLOB'),
+        ('circulation', 'REAL'),
+    ]
 
     def __init__(self, version, difficulty: int, reward: float, block_UTXO_usage_limit: int, miner_fees: float, block_height_limit: int, last_block_index: int, last_block_hash: bytes, circulation: float) -> None:
         self.version = version
@@ -18,20 +33,6 @@ class SanchainConfig(AbstractSanchainModel):
         self.last_block_index = last_block_index
         self.last_block_hash = last_block_hash
         self.circulation = circulation
-
-    @property
-    def db_columns(self):
-        return [
-            ('version', 'INTEGER PRIMARY KEY'),
-            ('difficulty', 'INTEGER'),
-            ('reward', 'REAL'),
-            ('block_UTXO_usage_limit', 'INTEGER'),
-            ('miner_fees', 'REAL'),
-            ('block_height_limit', 'INTEGER'),
-            ('last_block_index', 'INTEGER'),
-            ('last_block_hash', 'BLOB'),
-            ('circulation', 'REAL'),
-        ]
 
     @classmethod
     def default(cls):
@@ -46,7 +47,21 @@ class SanchainConfig(AbstractSanchainModel):
             # TODO: Get config from network
             return cls.default()
 
-    def update_local(self):
+    def update(self):
+        self = self.load_local()
+
+    def update_wrt_recent_block(self, block):
+        """
+        Updates the config parameters with respect to the recent block.
+        """
+        self.last_block_index = block.idx
+        self.last_block_hash = block.hash
+        # last transaction is the reward transaction
+        self.circulation += block.transactions[-1].amount
+
+        self.__update_local()
+
+    def __update_local(self):
         with open(self.PATH, 'w') as file:
             file.write(json.dumps(self.to_json()))
 

@@ -4,10 +4,12 @@ from abc import ABC, abstractmethod
 class AbstractBroadcastModel(ABC):
     """A model that can be broadcasted to other nodes."""
 
-    @property
-    def model_type(self):
-        """The type of the model."""
-        return self.__class__.__name__
+    model_type = None
+
+    def __init_subclass__(cls, **kwargs):
+        """Automatically set model_type to the class name for subclasses."""
+        super().__init_subclass__(**kwargs)
+        cls.model_type = cls.__name__
 
     @abstractmethod
     def to_json(self):
