@@ -7,7 +7,7 @@ import json
 from .config import SanchainConfig
 from ..utils import CONFIG
 from .transaction import Transaction, BlockReward
-from .base import AbstractSanchainModel
+from ..base import AbstractSanchainModel
 
 
 class Block(AbstractSanchainModel):

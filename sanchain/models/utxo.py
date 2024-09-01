@@ -1,6 +1,6 @@
 import base64
 
-from .base import AbstractSanchainModel
+from ..base import AbstractSanchainModel
 from ..utils import uid
 
 

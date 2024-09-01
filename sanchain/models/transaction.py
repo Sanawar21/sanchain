@@ -3,7 +3,7 @@ import base64
 import json
 
 from ..utils import uid, CONFIG
-from .base import AbstractSanchainModel
+from ..base import AbstractSanchainModel
 from .utxo import UTXO
 
 
