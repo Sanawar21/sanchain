@@ -1,11 +1,12 @@
 import pathlib
 import json
 import base64
-from .base import AbstractBroadcastModel
+from .base import AbstractBroadcastModel, AbstractDatabaseModel
 
 
-class SanchainConfig(AbstractBroadcastModel):
+class SanchainConfig(AbstractBroadcastModel, AbstractDatabaseModel):
     PATH = pathlib.Path('.Sanchain-config.json')
+    REWARD_SENDER = 'SANCHAIN'
 
     def __init__(self, version, difficulty: int, reward: float, block_UTXO_usage_limit: int, miner_fees: float, block_height_limit: int, last_block_index: int, last_block_hash: bytes, circulation: float) -> None:
         self.version = version
@@ -17,6 +18,20 @@ class SanchainConfig(AbstractBroadcastModel):
         self.last_block_index = last_block_index
         self.last_block_hash = last_block_hash
         self.circulation = circulation
+
+    @property
+    def db_columns(self):
+        return [
+            ('version', 'INTEGER PRIMARY KEY'),
+            ('difficulty', 'INTEGER'),
+            ('reward', 'REAL'),
+            ('block_UTXO_usage_limit', 'INTEGER'),
+            ('miner_fees', 'REAL'),
+            ('block_height_limit', 'INTEGER'),
+            ('last_block_index', 'INTEGER'),
+            ('last_block_hash', 'BLOB'),
+            ('circulation', 'REAL'),
+        ]
 
     @classmethod
     def default(cls):
@@ -61,4 +76,31 @@ class SanchainConfig(AbstractBroadcastModel):
             json_data['last_block_index'],
             base64.b64decode(json_data['last_block_hash']),
             json_data['circulation'],
+        )
+
+    def to_db_row(self):
+        return (
+            self.version,
+            self.difficulty,
+            self.reward,
+            self.block_UTXO_usage_limit,
+            self.miner_fees,
+            self.block_height_limit,
+            self.last_block_index,
+            self.last_block_hash,
+            self.circulation,
+        )
+
+    @classmethod
+    def from_db_row(cls, row):
+        return cls(
+            row[0],
+            row[1],
+            row[2],
+            row[3],
+            row[4],
+            row[5],
+            row[6],
+            row[7],
+            row[8],
         )

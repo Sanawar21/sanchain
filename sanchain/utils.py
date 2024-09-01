@@ -22,4 +22,4 @@ class UIDGenerator:
 
 __uidg = UIDGenerator()
 
-generate_uid = __uidg.get
+uid = __uidg.get

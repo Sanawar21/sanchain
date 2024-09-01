@@ -1,7 +1,7 @@
 import base64
 
 from .base import AbstractDatabaseModel, AbstractBroadcastModel
-from ..utils import generate_uid
+from ..utils import uid
 
 
 class UTXO(AbstractDatabaseModel, AbstractBroadcastModel):
@@ -17,7 +17,7 @@ class UTXO(AbstractDatabaseModel, AbstractBroadcastModel):
 
     @classmethod
     def nascent(cls, verification_key: bytes, value: float, index: int, block_index: int):
-        return cls(generate_uid(), verification_key, value, index, b'', block_index, -1)
+        return cls(uid(), verification_key, value, index, b'', block_index, -1)
 
     @classmethod
     def from_json(cls, data):

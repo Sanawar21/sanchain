@@ -1,7 +1,7 @@
 {
   "type": "SanchainConfig",
   "version": 1,
-  "difficulty": 4,
+  "difficulty": 2,
   "reward": 100,
   "block_UTXO_usage_limit": 10,
   "miner_fees": 0.01,

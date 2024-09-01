@@ -2,7 +2,7 @@ import rsa
 import base64
 import json
 
-from ..utils import generate_uid, CONFIG
+from ..utils import uid, CONFIG
 from .base import AbstractBroadcastModel, AbstractDatabaseModel
 from .utxo import UTXO
 
@@ -15,6 +15,8 @@ class Transaction(AbstractBroadcastModel, AbstractDatabaseModel):
 
     A verified transaction will be hashed and new UTXOs will be generated.
     """
+
+    REWARD_SENDER = 'SANCHAIN'
 
     def __init__(self, uid: int, sender: rsa.PublicKey, receiver: rsa.PublicKey, amount: float, utxos: list[UTXO], signature: bytes, nascent_utxos: list[UTXO], hash: bytes, block_index: int) -> None:
         self.uid = uid
@@ -45,7 +47,7 @@ class Transaction(AbstractBroadcastModel, AbstractDatabaseModel):
 
     @classmethod
     def unsigned(cls, sender: rsa.PublicKey, receiver: rsa.PublicKey, amount: float, utxos: list[UTXO]):
-        return cls(generate_uid(), sender, receiver, amount, utxos, b'', [], b'', -1)
+        return cls(uid(), sender, receiver, amount, utxos, b'', [], b'', -1)
 
     @classmethod
     def from_db_row(cls, row):
@@ -162,7 +164,7 @@ class Transaction(AbstractBroadcastModel, AbstractDatabaseModel):
         """Complete a transaction by creating new outputs as NascentUTXOs.
         This method should be called after the transaction has been verified.
         """
-        assert self.__is_verified
+        assert self.__is_verified, "Transaction must be verified first"
 
         self.block_index = CONFIG.last_block_index + 1
 
@@ -199,3 +201,31 @@ class Transaction(AbstractBroadcastModel, AbstractDatabaseModel):
             self.to_json()).encode(), "SHA-256")
 
         # TODO: Add the hash to the nascent UTXOs in the database
+
+
+class BlockReward(Transaction):
+    """Block reward transaction for the miner.
+    Use BlockReward.new() to create a new block reward transaction as a miner.
+    """
+
+    @classmethod
+    def new(cls, miner: rsa.PublicKey):
+        obj = cls(
+            uid(),
+            CONFIG.REWARD_SENDER,
+            miner,
+            CONFIG.reward,
+            [],
+            b'',
+            [UTXO.nascent(
+                rsa.compute_hash(miner, "SHA-256"),
+                CONFIG.reward,
+                0,
+                CONFIG.last_block_index + 1,
+            )],
+            b'',
+            CONFIG.last_block_index + 1,
+        )
+        obj.hash = rsa.compute_hash(json.dumps(
+            obj.to_json()).encode(), "SHA-256")
+        return obj
