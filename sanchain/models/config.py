@@ -1,10 +1,10 @@
 import pathlib
 import json
 import base64
-from .base import AbstractBroadcastModel, AbstractDatabaseModel
+from .base import AbstractSanchainModel
 
 
-class SanchainConfig(AbstractBroadcastModel, AbstractDatabaseModel):
+class SanchainConfig(AbstractSanchainModel):
     PATH = pathlib.Path('.Sanchain-config.json')
     REWARD_SENDER = 'SANCHAIN'
 

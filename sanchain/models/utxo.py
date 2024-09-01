@@ -1,10 +1,10 @@
 import base64
 
-from .base import AbstractDatabaseModel, AbstractBroadcastModel
+from .base import AbstractSanchainModel
 from ..utils import uid
 
 
-class UTXO(AbstractDatabaseModel, AbstractBroadcastModel):
+class UTXO(AbstractSanchainModel):
     def __init__(self, uid: int, verification_key: bytes, value: float, index: int, transaction_hash: bytes, block_index: int,  spender_transaction_uid: int) -> None:
         self.uid = uid
         # hash of the owner public key

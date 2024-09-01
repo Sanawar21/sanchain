@@ -7,10 +7,10 @@ import json
 from .config import SanchainConfig
 from ..utils import CONFIG
 from .transaction import Transaction, BlockReward
-from .base import AbstractDatabaseModel, AbstractBroadcastModel
+from .base import AbstractSanchainModel
 
 
-class Block(AbstractBroadcastModel, AbstractDatabaseModel):
+class Block(AbstractSanchainModel):
     """
     Use Block.new() to create a new block for mining.
     """

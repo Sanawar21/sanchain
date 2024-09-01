@@ -3,11 +3,11 @@ import base64
 import json
 
 from ..utils import uid, CONFIG
-from .base import AbstractBroadcastModel, AbstractDatabaseModel
+from .base import AbstractSanchainModel
 from .utxo import UTXO
 
 
-class Transaction(AbstractBroadcastModel, AbstractDatabaseModel):
+class Transaction(AbstractSanchainModel):
     """Transaction that can be signed and will be broadcasted
     to the mempool.
     Use Transaction.unsigned() to create a new unsigned transaction as client and sign it yourself.

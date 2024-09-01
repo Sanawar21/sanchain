@@ -71,3 +71,8 @@ class AbstractDatabaseModel(ABC):
     def from_db_row(cls, row):
         """Create a model from a tuple retrieved from a database."""
         pass
+
+
+class AbstractSanchainModel(AbstractBroadcastModel, AbstractDatabaseModel):
+    """A model that can be broadcasted to other nodes and stored in the database."""
+    pass
