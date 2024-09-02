@@ -1,2 +1,2 @@
 # sanchain
-My implementation of blockchain concepts into my own blockchain.
+Implementation of blockchain concepts into my own blockchain.
