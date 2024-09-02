@@ -12,6 +12,8 @@ class Account(AbstractBroadcastModel):
     def __init__(self, public_key: rsa.PublicKey, private_key: rsa.PrivateKey) -> None:
         self.public_key = public_key
         self.private_key = private_key
+        self.verification_key = rsa.compute_hash(
+            public_key.save_pkcs1("DER"), "SHA-256"),
 
     @classmethod
     def new(cls):

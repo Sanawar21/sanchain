@@ -5,6 +5,7 @@ import json
 from ..utils import uid, CONFIG
 from ..base import AbstractSanchainModel
 from .utxo import UTXO
+# from ..core import SanchainCore
 
 
 class Transaction(AbstractSanchainModel):
@@ -54,9 +55,9 @@ class Transaction(AbstractSanchainModel):
             rsa.PublicKey.load_pkcs1(base64.b64decode(row[1]), format="DER"),
             rsa.PublicKey.load_pkcs1(base64.b64decode(row[2]), format="DER"),
             row[3],
-            [],  # use uid to fetch the UTXOs from the database
+            row[-1],  # use uid to fetch the UTXOs from the database
             row[4],
-            [],  # use hash to fetch the UTXOs from the database
+            row[-2],  # use hash to fetch the UTXOs from the database
             row[5],
             row[6],
         )
@@ -278,9 +279,9 @@ class BlockReward(Transaction):
             CONFIG.REWARD_SENDER,
             rsa.PublicKey.load_pkcs1(base64.b64decode(row[2]), format="DER"),
             row[3],
-            [],  # use uid to fetch the UTXOs from the database
+            row[-1],  # use uid to fetch the UTXOs from the database
             row[4],
-            [],  # use hash to fetch the UTXOs from the database
+            row[-2],  # use hash to fetch the UTXOs from the database
             row[5],
             row[6],
         )

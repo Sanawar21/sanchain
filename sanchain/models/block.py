@@ -120,6 +120,15 @@ class Block(AbstractSanchainModel):
             self.config.circulation,
         )
 
+    def hashable(self):
+        return {
+            'idx': self.idx,
+            'timestamp': self.timestamp,
+            'merkle_root': base64.b64encode(self.merkle_root).decode(),
+            'transactions': [transaction.to_json() for transaction in self.transactions],
+            'config': self.config.to_json(),
+        }
+
     def __calculate_merkle_root(self):
         nodes = [transaction.hash for transaction in self.transactions]
 
@@ -167,11 +176,7 @@ class Block(AbstractSanchainModel):
         # calculate merkle hash
         self.merkle_root = self.__calculate_merkle_root()
 
-        block = self.to_json()
-
-        # remove hash key
-        del block['hash']
-        del block['nonce']
+        block = self.hashable()
 
         block_data = json.dumps(block).encode()
         hash, nonce = self.__calculate_hash(block_data)
