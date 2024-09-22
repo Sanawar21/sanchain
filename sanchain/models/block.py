@@ -3,6 +3,7 @@ import time
 import random
 import json
 import base64
+import sqlite3
 
 from ..config import SanchainConfig
 from ..utils import CONFIG
@@ -105,8 +106,8 @@ class Block(AbstractSanchainModel):
         return (
             self.idx,
             self.timestamp,
-            self.merkle_root,
-            self.hash,
+            sqlite3.Binary(self.merkle_root),
+            sqlite3.Binary(self.hash),
             self.nonce,
             # add config data
             self.config.version,
@@ -116,7 +117,7 @@ class Block(AbstractSanchainModel):
             self.config.miner_fees,
             self.config.block_height_limit,
             self.config.last_block_index,
-            self.config.last_block_hash,
+            sqlite3.Binary(self.config.last_block_hash),
             self.config.circulation,
         )
 
