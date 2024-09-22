@@ -1,6 +1,7 @@
 import rsa
 import base64
 import json
+import sqlite3
 
 from ..utils import uid, CONFIG
 from ..base import AbstractSanchainModel
@@ -17,8 +18,7 @@ class Transaction(AbstractSanchainModel):
     A verified transaction will be hashed and new UTXOs will be generated.
     """
 
-    REWARD_SENDER = 'SANCHAIN'
-
+    REWARD_SENDER = CONFIG.REWARD_SENDER
     db_columns = [
         ('uid', 'INTEGER PRIMARY KEY'),
         ('sender', 'BLOB'),
@@ -83,11 +83,11 @@ class Transaction(AbstractSanchainModel):
     def to_db_row(self):
         return (
             self.uid,
-            base64.b64encode(self.sender.save_pkcs1("DER")),
-            base64.b64encode(self.receiver.save_pkcs1("DER")),
+            sqlite3.Binary((base64.b64encode(self.sender.save_pkcs1("DER")))),
+            sqlite3.Binary(base64.b64encode(self.receiver.save_pkcs1("DER"))),
             self.amount,
-            self.signature,
-            self.hash,
+            sqlite3.Binary(self.signature),
+            sqlite3.Binary(self.hash),
             self.block_index,
         )
 
@@ -212,7 +212,7 @@ class BlockReward(Transaction):
     def new(cls, miner: rsa.PublicKey):
         obj = cls(
             uid(),
-            CONFIG.REWARD_SENDER,
+            CONFIG.REWARD_SENDER.public_key,
             miner,
             CONFIG.reward,
             [],
@@ -230,60 +230,4 @@ class BlockReward(Transaction):
             obj.to_json()).encode(), "SHA-256")
         for utxo in obj.nascent_utxos:
             utxo.transaction_hash = obj.hash
-        return obj
-
-    def to_json(self):
-        return {
-            'type': self.model_type,
-            'uid': self.uid,
-            'sender': CONFIG.REWARD_SENDER,
-            'receiver': base64.b64encode(self.receiver.save_pkcs1("DER")).decode(),
-            'amount': self.amount,
-            'signature': base64.b64encode(self.signature).decode(),
-            'utxos': [utxo.to_json() for utxo in self.utxos],
-            'nascent_utxos': [utxo.to_json() for utxo in self.nascent_utxos],
-            'hash': base64.b64encode(self.hash).decode(),
-            'block_index': self.block_index,
-        }
-
-    @classmethod
-    def from_json(cls, json_data):
-        return cls(
-            json_data['uid'],
-            CONFIG.REWARD_SENDER,
-            rsa.PublicKey.load_pkcs1(base64.b64decode(
-                json_data['receiver']), format="DER"),
-            json_data['amount'],
-            [UTXO.from_json(utxo) for utxo in json_data['utxos']],
-            base64.b64decode(json_data['signature']),
-            [UTXO.from_json(utxo) for utxo in json_data['nascent_utxos']],
-            base64.b64decode(json_data['hash']),
-            json_data['block_index'],
-        )
-
-    def to_db_row(self):
-        return (
-            self.uid,
-            CONFIG.REWARD_SENDER,
-            base64.b64encode(self.receiver.save_pkcs1("DER")),
-            self.amount,
-            self.signature,
-            self.hash,
-            self.block_index,
-        )
-
-    @classmethod
-    def from_db_row(cls, row):
-        obj = cls(
-            row[0],
-            CONFIG.REWARD_SENDER,
-            rsa.PublicKey.load_pkcs1(base64.b64decode(row[2]), format="DER"),
-            row[3],
-            row[-1],  # use uid to fetch the UTXOs from the database
-            row[4],
-            row[-2],  # use hash to fetch the UTXOs from the database
-            row[5],
-            row[6],
-        )
-        # TODO: fetch the UTXOs from the database
         return obj
