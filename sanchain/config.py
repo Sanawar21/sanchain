@@ -2,14 +2,22 @@ import pathlib
 import json
 import base64
 import os
+import sqlite3
 
+from .models.account import Account  # prevents circular import
 from .base import AbstractSanchainModel
 
 
 class SanchainConfig(AbstractSanchainModel):
     PATH = pathlib.Path(os.getcwd()) / '.Sanchain-config.json'
-    REWARD_SENDER = 'SANCHAIN'
     DB_FOLDER = pathlib.Path(os.getcwd()) / 'data'
+    REWARD_SENDER = Account.from_json(
+        {
+            'public_key': 'MEgCQQCT7Caq7rTxn+ZbpY2CkTvactkiQvLO8SiZdiR5BIl0YreoOIvtJI5UL5LcXbQFikvA0KIHptBlmGFqi+Us5GKNAgMBAAE=',
+            'private_key': 'MIIBOwIBAAJBAJPsJqrutPGf5luljYKRO9py2SJC8s7xKJl2JHkEiXRit6g4i+0kjlQvktxdtAWKS8DQogem0GWYYWqL5SzkYo0CAwEAAQJAGtv6eXc2q9kY/vMkqtysPZI1Ex+M7z6i3JqzLLZCBCMkE8TFe5XJlXdpC3pOFaR71lUN62kL9Ko26RTcaWQ+AQIjAO1Y/TT10iN2lPvys/YGlBi5xgKIMAW9IXprvylJwOlnKGECHwCfjBZdv/cQwkTWchq10KH0BkMpScXIItRSzaYAua0CIgdsmy8G6XXWhb6DzwFJH2TOmtUFcYscaWms6SPffLtQUMECHknsIUzMrc+RA04Mzj1hbjhfUmzl5oKlSJUY/YomfQIibQB+ZEqSKq8yHz1lIsO0oh5B0gfWYBM5fx0MXA/r7Rbe+w==',
+        }
+
+    )
 
     db_columns = [
         ('version', 'INTEGER PRIMARY KEY'),
@@ -36,7 +44,7 @@ class SanchainConfig(AbstractSanchainModel):
 
     @classmethod
     def default(cls):
-        return cls(1, 4, 100.0, 10, 0.01, 1000, -1, b'', 0.0)
+        return cls(1, 3, 100.0, 1000, 0.01, 100, -1, b'', 0.0)
 
     @classmethod
     def load_local(cls):
@@ -47,21 +55,24 @@ class SanchainConfig(AbstractSanchainModel):
             # TODO: Get config from network
             return cls.default()
 
-    def update(self):
+    def refresh(self):
+        """Refreshes the config from the local file."""
         self = self.load_local()
 
     def update_wrt_recent_block(self, block):
         """
-        Updates the config parameters with respect to the recent block.
+        Updates the config parameters with respect to the recent block
+        both locally and for self.
         """
         self.last_block_index = block.idx
         self.last_block_hash = block.hash
         # last transaction is the reward transaction
         self.circulation += block.transactions[-1].amount
 
-        self.__update_local()
+        self.update_local_config()
 
-    def __update_local(self):
+    def update_local_config(self):
+        """Changes the local config to self."""
         with open(self.PATH, 'w') as file:
             file.write(json.dumps(self.to_json()))
 
@@ -102,7 +113,7 @@ class SanchainConfig(AbstractSanchainModel):
             self.miner_fees,
             self.block_height_limit,
             self.last_block_index,
-            self.last_block_hash,
+            sqlite3.Binary(self.last_block_hash),
             self.circulation,
         )
 
