@@ -164,4 +164,3 @@ cython_debug/
 # custom
 test.py
 data/
-miner.py
