@@ -1,4 +1,5 @@
 import base64
+import sqlite3
 
 from ..base import AbstractSanchainModel
 from ..utils import uid
@@ -24,6 +25,16 @@ class UTXO(AbstractSanchainModel):
         self.transaction_hash = transaction_hash
         self.block_index = block_index
         self.spender_transaction_uid = spender_transaction_uid
+
+    def __eq__(self, value: object) -> bool:
+        return isinstance(value, UTXO) \
+            and value.uid == self.uid \
+            and value.verification_key == self.verification_key \
+            and value.value == self.value \
+            and value.idx == self.idx \
+            and value.transaction_hash == self.transaction_hash \
+            and value.block_index == self.block_index \
+            and value.spender_transaction_uid == self.spender_transaction_uid
 
     @classmethod
     def nascent(cls, verification_key: bytes, value: float, idx: int, block_index: int):
@@ -56,10 +67,10 @@ class UTXO(AbstractSanchainModel):
     def to_db_row(self):
         return (
             self.uid,
-            self.verification_key,
+            sqlite3.Binary(self.verification_key),
             self.value,
             self.idx,
-            self.transaction_hash,
+            sqlite3.Binary(self.transaction_hash),
             self.block_index,
             self.spender_transaction_uid,
         )
