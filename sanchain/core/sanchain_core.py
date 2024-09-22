@@ -1,6 +1,7 @@
 import sqlite3
 import os
 import pathlib
+import base64
 
 from ..models import Block, Transaction, UTXO, BlockReward
 from ..utils import CONFIG
@@ -19,8 +20,11 @@ class Mempool:
             cursor = conn.cursor()
             cursor.execute(f"SELECT * FROM mempool LIMIT {limit}")
             txns = []
+            sanchain_sender = base64.b64encode(
+                Transaction.REWARD_SENDER.public_key.save_pkcs1("DER"))
             for row in cursor.fetchall():
-                if row[0] == Transaction.model_type:
+
+                if row[1] != sanchain_sender:
 
                     # fetch input utxos via uid and output transactions via hash
                     # and append to the row
@@ -38,6 +42,7 @@ class Mempool:
                         nascent_utxos.append(
                             UTXO.from_db_row(nascent_utxo_row))
 
+                    row = list(row)
                     row.append(nascent_utxos)
                     row.append(utxos)
                     txns.append(Transaction.from_db_row(row))
@@ -56,8 +61,8 @@ class Mempool:
                         nascent_utxos.append(
                             UTXO.from_db_row(nascent_utxo_row))
 
+                    row = list(row)
                     row.append(nascent_utxos)
-
                     row.append(utxos)
                     txns.append(BlockReward.from_db_row(row))
             return txns
@@ -131,14 +136,20 @@ class UTXOSet:
             rows = cursor.fetchall()
             return [UTXO.from_db_row(row) for row in rows]
 
-    def fetch_by_owner(self, verification_key: bytes):
+    def fetch_by_owner(self, verification_key: bytes, unused: bool = False):
         with sqlite3.connect(self.path) as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT * FROM utxos WHERE verification_key = ?", (str(
-                    verification_key),)
-            )
-            # TODO: FIX THIS BLOB BUG
+            if unused:
+                cursor.execute(
+                    "SELECT * FROM utxos WHERE verification_key = ? AND spender_transaction_uid = -1",
+                    verification_key,
+                )
+            else:
+                cursor.execute(
+                    "SELECT * FROM utxos WHERE verification_key = ?",
+                    verification_key,
+                )
+
             rows = cursor.fetchall()
             return [UTXO.from_db_row(row) for row in rows]
 
@@ -175,7 +186,7 @@ class SanchainCore:
 
     @classmethod
     def new(cls, uid: str):
-        """Creates a new core without removing the previous one. 
+        """Creates a new core without removing the previous one.
         UID is the unique identifier of the core."""
         os.mkdir(CONFIG.DB_FOLDER / uid)
         obj = cls(CONFIG.DB_FOLDER / uid / cls.DB_NAME)
@@ -228,7 +239,9 @@ class SanchainCore:
 
     def validate_utxo(self, utxo: UTXO):
         """Backtracks the UTXO to its origin and validates it."""
-        # TODO: Implement this
+        # fetch transaction by id in the UTXO set
+        in_set = self.utxo_set.fetch_by_uid(utxo.uid)
+        return utxo == in_set
 
     def add_block(self, block: Block):
         with sqlite3.connect(self.path) as conn:
