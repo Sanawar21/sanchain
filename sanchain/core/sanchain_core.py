@@ -26,7 +26,7 @@ class Mempool:
 
                 if row[1] != sanchain_sender:
 
-                    # fetch input utxos via uid and output transactions via hash
+                    # fetch input utxos via uid and output utxos via hash
                     # and append to the row
 
                     cursor.execute(

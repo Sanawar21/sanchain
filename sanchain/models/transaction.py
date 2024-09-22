@@ -33,11 +33,11 @@ class Transaction(AbstractSanchainModel):
         self.uid = uid
         self.sender = sender
         self.receiver = receiver
-        self.amount = amount
-        self.utxos = utxos
+        self.amount = float(amount)
+        self.utxos = utxos  # input utxos
         self.signature = signature
 
-        self.nascent_utxos = nascent_utxos
+        self.nascent_utxos = nascent_utxos  # output utxos
         self.hash = hash
 
         self.block_index = block_index
@@ -46,7 +46,7 @@ class Transaction(AbstractSanchainModel):
 
     @classmethod
     def unsigned(cls, sender: rsa.PublicKey, receiver: rsa.PublicKey, amount: float, utxos: list[UTXO]):
-        return cls(uid(), sender, receiver, amount, utxos, b'', [], b'', -1)
+        return cls(uid(), sender, receiver, float(amount), utxos, b'', [], b'', -1)
 
     @classmethod
     def from_db_row(cls, row):
@@ -54,10 +54,10 @@ class Transaction(AbstractSanchainModel):
             row[0],
             rsa.PublicKey.load_pkcs1(base64.b64decode(row[1]), format="DER"),
             rsa.PublicKey.load_pkcs1(base64.b64decode(row[2]), format="DER"),
-            row[3],
-            row[-1],  # use uid to fetch the UTXOs from the database
+            float(row[3]),
+            row[-2],  # use uid to fetch the UTXOs from the database
             row[4],
-            row[-2],  # use hash to fetch the UTXOs from the database
+            row[-1],  # use hash to fetch the UTXOs from the database
             row[5],
             row[6],
         )
@@ -72,7 +72,7 @@ class Transaction(AbstractSanchainModel):
                 json_data['sender']), format="DER"),
             rsa.PublicKey.load_pkcs1(base64.b64decode(
                 json_data['receiver']), format="DER"),
-            json_data['amount'],
+            float(json_data['amount']),
             [UTXO.from_json(utxo) for utxo in json_data['utxos']],
             base64.b64decode(json_data['signature']),
             [UTXO.from_json(utxo) for utxo in json_data['nascent_utxos']],
@@ -85,7 +85,7 @@ class Transaction(AbstractSanchainModel):
             self.uid,
             sqlite3.Binary((base64.b64encode(self.sender.save_pkcs1("DER")))),
             sqlite3.Binary(base64.b64encode(self.receiver.save_pkcs1("DER"))),
-            self.amount,
+            float(self.amount),
             sqlite3.Binary(self.signature),
             sqlite3.Binary(self.hash),
             self.block_index,
@@ -97,7 +97,7 @@ class Transaction(AbstractSanchainModel):
             'uid': self.uid,
             'sender': base64.b64encode(self.sender.save_pkcs1("DER")).decode(),
             'receiver': base64.b64encode(self.receiver.save_pkcs1("DER")).decode(),
-            'amount': self.amount,
+            'amount': float(self.amount),
             'signature': base64.b64encode(self.signature).decode(),
             'utxos': [utxo.to_json() for utxo in self.utxos],
             'nascent_utxos': [utxo.to_json() for utxo in self.nascent_utxos],
@@ -105,17 +105,29 @@ class Transaction(AbstractSanchainModel):
             'block_index': self.block_index,
         }
 
-    def sign(self, private_key: rsa.PrivateKey):
-        # at this point, the transaction will contain only the
-        # sender, receiver, amount and utxos
-        # so remove everything else and sign the transaction
-        # when verifying, remove everything else and verify the signature
+    def signable(self):
         data = self.to_json()
 
         del data['signature']
         del data['nascent_utxos']
         del data['hash']
         del data['block_index']
+
+        utxo_without_spender = []
+        for utxo in self.utxos:
+            utxo_without_spender.append(utxo.to_json())
+            del utxo_without_spender[-1]['spender_transaction_uid']
+
+        data['utxos'] = utxo_without_spender
+        return data
+
+    def sign(self, private_key: rsa.PrivateKey):
+        # at this point, the transaction will contain only the
+        # sender, receiver, amount and utxos
+        # so remove everything else and sign the transaction
+        # when verifying, remove everything else and verify the signature
+
+        data = self.signable()
 
         self.signature = rsa.sign(
             json.dumps(data).encode(),
@@ -126,14 +138,7 @@ class Transaction(AbstractSanchainModel):
     def verify(self):
         """Verify the transaction and its utxos."""
         try:
-            # verify the transaction itself
-            data = self.to_json()
-
-            # prepare the data for verification
-            del data['signature']
-            del data['nascent_utxos']
-            del data['hash']
-            del data['block_index']
+            data = self.signable()
 
             rsa.verify(
                 json.dumps(data).encode(),
@@ -153,7 +158,7 @@ class Transaction(AbstractSanchainModel):
                 self.amount + self.amount * CONFIG.miner_fees), "Insufficient balance"
 
         except (rsa.VerificationError, KeyError, AssertionError):
-            self.__is_verified = True
+            self.__is_verified = False
             return False
         else:
             self.__is_verified = True
@@ -166,11 +171,12 @@ class Transaction(AbstractSanchainModel):
         assert self.__is_verified, "Transaction must be verified first"
 
         self.block_index = CONFIG.last_block_index + 1
+        input_amount = sum([utxo.value for utxo in self.utxos])
 
         self.nascent_utxos = [
             UTXO.nascent(  # miner's fees
                 rsa.compute_hash(miner.save_pkcs1("DER"), "SHA-256"),
-                self.amount * CONFIG.miner_fee,
+                self.amount * CONFIG.miner_fees,
                 0,
                 self.block_index,
             ),
@@ -183,7 +189,7 @@ class Transaction(AbstractSanchainModel):
         ]
 
         # return change, if any
-        change = self.amount - sum([utxo.value for utxo in self.nascent_utxos])
+        change = input_amount - self.amount
 
         if change > 0:
             self.nascent_utxos.append(  # sender's change

@@ -1,0 +1,28 @@
+{
+  "configurations": [
+    {
+      "name": "Python Debugger: user",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "scripts.user"
+    },
+    {
+      "name": "Python Debugger: miner",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "scripts.miner"
+    },
+    {
+      "name": "Python Debugger: Python File",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}"
+    },
+    {
+      "name": "Python Debugger: test.py File",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}"
+    }
+  ]
+}

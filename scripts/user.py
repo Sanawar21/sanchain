@@ -4,19 +4,24 @@ from sanchain.core import SanchainCore
 
 import json
 
-# 3 has 1000, he sends 345 to 2 and 466 to 4 and 5 mine the new block
+# 5 has 1000, he sends 345 to 2 and 466 to 4 and 5 mine the new block
 
 if __name__ == "__main__":
-    core = SanchainCore.local('test-2')
+    sender = 5
+    receiver = 2
+    amount = 345
+
+    core = SanchainCore.local('test-3')
+
     rich = Account.from_json(
-        json.load(open(CONFIG.DB_FOLDER / "accounts/account_3.json", "r")))
+        json.load(open(CONFIG.DB_FOLDER / f"accounts/account_{sender}.json", "r")))
     poor_address = Account.from_json(
-        json.load(open(CONFIG.DB_FOLDER / "accounts/account_2.json", "r"))).public_key
+        json.load(open(CONFIG.DB_FOLDER / f"accounts/account_{receiver}.json", "r"))).public_key
 
     txn = Transaction.unsigned(
         rich.public_key,
         poor_address,
-        345,
+        amount,
         []
     )
     rich_utxos = core.utxo_set.fetch_by_owner(
