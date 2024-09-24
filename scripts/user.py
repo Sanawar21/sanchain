@@ -5,9 +5,9 @@ from sanchain.core import SanchainCore
 # 5 has 1000, he sends 345 to 2 and 466 to 4 and 5 mine the new block
 
 if __name__ == "__main__":
-    sender = "4"
-    receiver = "3"
-    amount = 60
+    sender = "3"
+    receiver = "5"
+    amount = 10
 
     core = SanchainCore.local('test-5')
 
@@ -35,3 +35,5 @@ if __name__ == "__main__":
     txn.utxos = to_use
     txn.sign(rich.private_key)
     core.mempool.add_transaction(txn)
+
+    # TODO: Why are the current transactions not being mined?

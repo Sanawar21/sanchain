@@ -117,6 +117,7 @@ class SanchainCore:
         return utxo == in_set
 
     def add_block(self, block: Block):
+        """Adds a block to the blockchain and updates the config wrt the block."""
         with sqlite3.connect(self.path) as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -124,6 +125,7 @@ class SanchainCore:
                 block.to_db_row()
             )
             conn.commit()
+        self.config.update_wrt_recent_block(block)
 
         for transaction in block.transactions:
             self.__add_transaction(transaction)
