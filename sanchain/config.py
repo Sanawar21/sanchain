@@ -9,7 +9,6 @@ from .base import AbstractSanchainModel
 
 
 class SanchainConfig(AbstractSanchainModel):
-    PATH = pathlib.Path(os.getcwd()) / '.Sanchain-config.json'
     DB_FOLDER = pathlib.Path(os.getcwd()) / 'data'
     REWARD_SENDER = Account.from_json(
         {
@@ -31,7 +30,8 @@ class SanchainConfig(AbstractSanchainModel):
         ('circulation', 'REAL'),
     ]
 
-    def __init__(self, version, difficulty: int, reward: float, block_UTXO_usage_limit: int, miner_fees: float, block_height_limit: int, last_block_index: int, last_block_hash: bytes, circulation: float) -> None:
+    def __init__(self, core_id, version, difficulty: int, reward: float, block_UTXO_usage_limit: int, miner_fees: float, block_height_limit: int, last_block_index: int, last_block_hash: bytes, circulation: float) -> None:
+        self.core_id = core_id
         self.version = version
         self.difficulty = difficulty
         self.reward = reward
@@ -42,18 +42,26 @@ class SanchainConfig(AbstractSanchainModel):
         self.last_block_hash = last_block_hash
         self.circulation = circulation
 
-    @classmethod
-    def default(cls):
-        return cls(1, 3, 100.0, 1000, 0.01, 100, -1, b'', 0.0)
+        self.path = self.__get_path(self.core_id)
 
     @classmethod
-    def load_local(cls):
-        if cls.PATH.exists():
-            with open(cls.PATH, 'r') as file:
-                return cls.from_json(json.loads(file.read()))
+    def __get_path(cls, core_id):
+        return pathlib.Path(
+            cls.DB_FOLDER / core_id / '.Sanchain-config.json')
+
+    @classmethod
+    def default(cls, core_id):
+        return cls(core_id, 1, 3, 100.0, 1000, 0.01, 100, -1, b'', 0.0)
+
+    @classmethod
+    def load_local(cls, core_id):
+        path = cls.__get_path(core_id)
+        if path.exists():
+            with open(path, 'r') as file:
+                return cls.from_json(json.loads(file.read()), core_id)
         else:
             # TODO: Get config from network
-            return cls.default()
+            return cls.default(core_id)
 
     def refresh(self):
         """Refreshes the config from the local file."""
@@ -73,7 +81,7 @@ class SanchainConfig(AbstractSanchainModel):
 
     def update_local_config(self):
         """Changes the local config to self."""
-        with open(self.PATH, 'w') as file:
+        with open(self.path, 'w') as file:
             file.write(json.dumps(self.to_json()))
 
     def to_json(self):
@@ -91,8 +99,9 @@ class SanchainConfig(AbstractSanchainModel):
         }
 
     @classmethod
-    def from_json(cls, json_data):
+    def from_json(cls, json_data, core_id):
         return cls(
+            core_id,
             json_data['version'],
             json_data['difficulty'],
             json_data['reward'],
@@ -118,8 +127,9 @@ class SanchainConfig(AbstractSanchainModel):
         )
 
     @classmethod
-    def from_db_row(cls, row):
+    def from_db_row(cls, row, core_id):
         return cls(
+            core_id,
             row[0],
             row[1],
             row[2],

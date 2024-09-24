@@ -1,22 +1,20 @@
 from sanchain.models import Transaction, Account, UTXO
-from sanchain.utils import CONFIG
 from sanchain.core import SanchainCore
 
-import json
 
 # 5 has 1000, he sends 345 to 2 and 466 to 4 and 5 mine the new block
 
 if __name__ == "__main__":
-    sender = 5
-    receiver = 2
-    amount = 345
+    sender = "4"
+    receiver = "3"
+    amount = 60
 
-    core = SanchainCore.local('test-3')
+    core = SanchainCore.local('test-5')
 
-    rich = Account.from_json(
-        json.load(open(CONFIG.DB_FOLDER / f"accounts/account_{sender}.json", "r")))
-    poor_address = Account.from_json(
-        json.load(open(CONFIG.DB_FOLDER / f"accounts/account_{receiver}.json", "r"))).public_key
+    rich = Account.from_json_path(
+        (core.config.DB_FOLDER / f"accounts/account_{sender}.json"))
+    poor_address = Account.from_json_path(
+        (core.config.DB_FOLDER / f"accounts/account_{receiver}.json")).public_key
 
     txn = Transaction.unsigned(
         rich.public_key,

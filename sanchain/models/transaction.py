@@ -3,7 +3,8 @@ import base64
 import json
 import sqlite3
 
-from ..utils import uid, CONFIG
+from ..utils import uid
+from ..config import SanchainConfig
 from ..base import AbstractSanchainModel
 from .utxo import UTXO
 # from ..core import SanchainCore
@@ -18,7 +19,6 @@ class Transaction(AbstractSanchainModel):
     A verified transaction will be hashed and new UTXOs will be generated.
     """
 
-    REWARD_SENDER = CONFIG.REWARD_SENDER
     db_columns = [
         ('uid', 'INTEGER PRIMARY KEY'),
         ('sender', 'BLOB'),
@@ -135,7 +135,7 @@ class Transaction(AbstractSanchainModel):
             'SHA-256'
         )
 
-    def verify(self):
+    def verify(self, config: SanchainConfig):
         """Verify the transaction and its utxos."""
         try:
             data = self.signable()
@@ -155,7 +155,7 @@ class Transaction(AbstractSanchainModel):
 
             # verify the balance
             assert sum([utxo.value for utxo in self.utxos]) >= (
-                self.amount + self.amount * CONFIG.miner_fees), "Insufficient balance"
+                self.amount + self.amount * config.miner_fees), "Insufficient balance"
 
         except (rsa.VerificationError, KeyError, AssertionError):
             self.__is_verified = False
@@ -164,19 +164,19 @@ class Transaction(AbstractSanchainModel):
             self.__is_verified = True
             return True
 
-    def execute(self, miner: rsa.PublicKey):
+    def execute(self, miner: rsa.PublicKey, config: SanchainConfig):
         """Complete a transaction by creating new outputs as NascentUTXOs.
         This method should be called after the transaction has been verified.
         """
         assert self.__is_verified, "Transaction must be verified first"
 
-        self.block_index = CONFIG.last_block_index + 1
+        self.block_index = config.last_block_index + 1
         input_amount = sum([utxo.value for utxo in self.utxos])
 
         self.nascent_utxos = [
             UTXO.nascent(  # miner's fees
                 rsa.compute_hash(miner.save_pkcs1("DER"), "SHA-256"),
-                self.amount * CONFIG.miner_fees,
+                self.amount * config.miner_fees,
                 0,
                 self.block_index,
             ),
@@ -215,25 +215,26 @@ class BlockReward(Transaction):
     """
 
     @classmethod
-    def new(cls, miner: rsa.PublicKey):
+    def new(cls, miner: rsa.PublicKey, config: SanchainConfig):
         obj = cls(
             uid(),
-            CONFIG.REWARD_SENDER.public_key,
+            config.REWARD_SENDER.public_key,
             miner,
-            CONFIG.reward,
-            [],
-            b'',
+            config.reward,
+            [],  # input utxos
+            b'',  # signature
             [UTXO.nascent(
                 rsa.compute_hash(miner.save_pkcs1("DER"), "SHA-256"),
-                CONFIG.reward,
+                config.reward,
                 0,
-                CONFIG.last_block_index + 1,
-            )],
-            b'',
-            CONFIG.last_block_index + 1,
+                config.last_block_index + 1,
+            )],  # nascent utxos (output)
+            b'',  # hash
+            config.last_block_index + 1,
         )
         obj.hash = rsa.compute_hash(json.dumps(
             obj.to_json()).encode(), "SHA-256")
         for utxo in obj.nascent_utxos:
             utxo.transaction_hash = obj.hash
+        obj.sign(config.REWARD_SENDER.private_key)
         return obj

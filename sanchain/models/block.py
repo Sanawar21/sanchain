@@ -6,7 +6,6 @@ import base64
 import sqlite3
 
 from ..config import SanchainConfig
-from ..utils import CONFIG
 from .transaction import Transaction, BlockReward
 from ..base import AbstractSanchainModel
 
@@ -45,12 +44,12 @@ class Block(AbstractSanchainModel):
         self.invalid_transactions = []
 
     @classmethod
-    def new(cls, transactions: list[Transaction]):
+    def new(cls, transactions: list[Transaction], config: SanchainConfig):
         return cls(
-            CONFIG.last_block_index + 1,
+            config.last_block_index + 1,
             0,
             b'',
-            CONFIG,
+            config,
             transactions,
             b'',
             0,
@@ -142,7 +141,7 @@ class Block(AbstractSanchainModel):
                     new_nodes.append(rsa.compute_hash(
                         nodes[i] + nodes[i + 1], 'SHA-256'))
                 except IndexError:
-                    new_nodes.append(rsa.compute_hash(nodes[i]), 'SHA-256')
+                    new_nodes.append(rsa.compute_hash(nodes[i], 'SHA-256'))
 
             nodes = new_nodes
 
@@ -164,15 +163,15 @@ class Block(AbstractSanchainModel):
 
         # verify and execute transactions
         for transaction in self.transactions:
-            if transaction.verify():
-                transaction.execute(miner)
+            if transaction.verify(self.config):
+                transaction.execute(miner, self.config)
             else:
                 self.invalid_transactions.append(transaction)
 
         for transaction in self.invalid_transactions:
             self.transactions.remove(transaction)
 
-        self.transactions.append(BlockReward.new(miner))
+        self.transactions.append(BlockReward.new(miner, self.config))
 
         # calculate merkle hash
         self.merkle_root = self.__calculate_merkle_root()

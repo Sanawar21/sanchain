@@ -4,7 +4,7 @@ import pathlib
 import base64
 
 from ..models import Block, Transaction, UTXO, BlockReward
-from ..utils import CONFIG
+from ..config import SanchainConfig
 
 
 class Mempool:
@@ -12,16 +12,23 @@ class Mempool:
     Mempool class to be aggregated in SanchainCore
     """
 
-    def __init__(self, path: pathlib.Path) -> None:
+    def __init__(self, path: pathlib.Path, config: SanchainConfig) -> None:
         self.path = path
+        self.config = config
 
-    def read_transactions(self, limit: int = CONFIG.block_height_limit):
+    def read_transactions(self, limit: int = None):
+        """Read `limit` amount of transactions.
+        By default, limit is CONFIG.block_height_limit."""
+
+        if not limit:
+            limit = self.config.block_height_limit
+
         with sqlite3.connect(self.path) as conn:
             cursor = conn.cursor()
             cursor.execute(f"SELECT * FROM mempool LIMIT {limit}")
             txns = []
             sanchain_sender = base64.b64encode(
-                Transaction.REWARD_SENDER.public_key.save_pkcs1("DER"))
+                self.config.REWARD_SENDER.public_key.save_pkcs1("DER"))
             for row in cursor.fetchall():
 
                 if row[1] != sanchain_sender:
@@ -179,24 +186,28 @@ class SanchainCore:
 
     DB_NAME = 'sanchainCore.db'
 
-    def __init__(self, path: pathlib.Path):
+    def __init__(self, path: pathlib.Path, config: SanchainConfig):
         self.path = path
-        self.mempool = Mempool(self.path)
+        self.config = config
+        self.mempool = Mempool(self.path, self.config)
         self.utxo_set = UTXOSet(self.path)
 
     @classmethod
     def new(cls, uid: str):
         """Creates a new core without removing the previous one.
         UID is the unique identifier of the core."""
-        os.mkdir(CONFIG.DB_FOLDER / uid)
-        obj = cls(CONFIG.DB_FOLDER / uid / cls.DB_NAME)
+        config = SanchainConfig.default(uid)
+        os.mkdir(config.DB_FOLDER / uid)
+        obj = cls(config.DB_FOLDER / uid / cls.DB_NAME, config)
         obj.__create_tables()
+        config.update_local_config()
         return obj
 
     @classmethod
     def local(cls, uid):
         """Loads the core from disk."""
-        obj = cls(CONFIG.DB_FOLDER / uid / cls.DB_NAME)
+        config = SanchainConfig.load_local(uid)
+        obj = cls(config.DB_FOLDER / uid / cls.DB_NAME, config)
         assert os.path.exists(obj.path)
         return obj
 

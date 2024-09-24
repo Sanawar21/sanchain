@@ -1,10 +1,6 @@
 import time
 import random
 
-from .config import SanchainConfig
-
-CONFIG = SanchainConfig.load_local()
-
 
 class UIDGenerator:
     last_uid = 0
@@ -21,5 +17,4 @@ class UIDGenerator:
 
 
 __uidg = UIDGenerator()
-
 uid = __uidg.get

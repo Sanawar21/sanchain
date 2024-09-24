@@ -1,5 +1,6 @@
 import rsa
 import base64
+import json
 
 from ..base import AbstractBroadcastModel
 
@@ -27,6 +28,11 @@ class Account(AbstractBroadcastModel):
             rsa.PrivateKey.load_pkcs1(base64.b64decode(
                 json_data['private_key']), format="DER"),
         )
+
+    @classmethod
+    def from_json_path(cls, path):
+        with open(path, 'r') as file:
+            return cls.from_json(json.load(file))
 
     def to_json(self):
         return {
