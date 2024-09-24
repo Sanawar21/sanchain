@@ -1,173 +1,11 @@
 import sqlite3
 import os
 import pathlib
-import base64
 
-from ..models import Block, Transaction, UTXO, BlockReward
+from ..models import Block, Transaction, UTXO
 from ..config import SanchainConfig
-
-
-class Mempool:
-    """
-    Mempool class to be aggregated in SanchainCore
-    """
-
-    def __init__(self, path: pathlib.Path, config: SanchainConfig) -> None:
-        self.path = path
-        self.config = config
-
-    def read_transactions(self, limit: int = None):
-        """Read `limit` amount of transactions.
-        By default, limit is CONFIG.block_height_limit."""
-
-        if not limit:
-            limit = self.config.block_height_limit
-
-        with sqlite3.connect(self.path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(f"SELECT * FROM mempool LIMIT {limit}")
-            txns = []
-            sanchain_sender = base64.b64encode(
-                self.config.REWARD_SENDER.public_key.save_pkcs1("DER"))
-            for row in cursor.fetchall():
-
-                if row[1] != sanchain_sender:
-
-                    # fetch input utxos via uid and output utxos via hash
-                    # and append to the row
-
-                    cursor.execute(
-                        f"SELECT * FROM utxos WHERE transaction_hash = {row[6]}")
-                    utxos = []
-                    for utxo_row in cursor.fetchall():
-                        utxos.append(UTXO.from_db_row(utxo_row))
-
-                    cursor.execute(
-                        f"SELECT * FROM utxos WHERE spender_transaction_uid = {row[0]}")
-                    nascent_utxos = []
-                    for nascent_utxo_row in cursor.fetchall():
-                        nascent_utxos.append(
-                            UTXO.from_db_row(nascent_utxo_row))
-
-                    row = list(row)
-                    row.append(nascent_utxos)
-                    row.append(utxos)
-                    txns.append(Transaction.from_db_row(row))
-                else:
-
-                    cursor.execute(
-                        f"SELECT * FROM utxos WHERE transaction_hash = {row[6]}")
-                    utxos = []
-                    for utxo_row in cursor.fetchall():
-                        utxos.append(UTXO.from_db_row(utxo_row))
-
-                    cursor.execute(
-                        f"SELECT * FROM utxos WHERE spender_transaction_uid = {row[0]}")
-                    nascent_utxos = []
-                    for nascent_utxo_row in cursor.fetchall():
-                        nascent_utxos.append(
-                            UTXO.from_db_row(nascent_utxo_row))
-
-                    row = list(row)
-                    row.append(nascent_utxos)
-                    row.append(utxos)
-                    txns.append(BlockReward.from_db_row(row))
-            return txns
-
-    def add_transaction(self, transaction: Transaction):
-        with sqlite3.connect(self.path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                f"INSERT INTO mempool VALUES ({', '.join(['?' for _ in range(len(Transaction.db_columns))])})",
-                transaction.to_db_row()
-            )
-
-            # add spender transaction uid to the UTXOs
-            for utxo in transaction.utxos:
-                cursor.execute(
-                    f"UPDATE utxos SET spender_transaction_uid = {transaction.uid} WHERE uid = {utxo.uid}")
-
-            conn.commit()
-
-    def remove_transaction(self, transaction: Transaction):
-        with sqlite3.connect(self.path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                f"DELETE FROM mempool WHERE uid = {transaction.uid}")
-            conn.commit()
-
-    def update_transaction(self, transaction: Transaction):
-        with sqlite3.connect(self.path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                f"UPDATE mempool SET {', '.join([f'{column[0]} = ?' for column in Transaction.db_columns])} WHERE uid = {transaction.uid}",
-            )
-
-
-class UTXOSet:
-    """
-    UTXOSet class to be aggregated in SanchainCore
-    """
-
-    def __init__(self, path: pathlib.Path) -> None:
-        self.path = path
-
-    def add_utxo(self, utxo: UTXO):
-        with sqlite3.connect(self.path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                f"INSERT INTO utxos VALUES ({', '.join(['?' for _ in range(len(UTXO.db_columns))])})",
-                utxo.to_db_row()
-            )
-            conn.commit()
-
-    def remove_utxo(self, utxo: UTXO):
-        with sqlite3.connect(self.path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                f"DELETE FROM utxos WHERE uid = {utxo.uid}")
-            conn.commit()
-
-    def update_utxo(self, utxo: UTXO):
-        with sqlite3.connect(self.path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                f"UPDATE utxos SET {', '.join([f'{column[0]} = ?' for column in UTXO.db_columns])} WHERE uid = {utxo.uid}",
-            )
-
-    def fetch_by_hash(self, hash: bytes):
-        with sqlite3.connect(self.path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                f"SELECT * FROM utxos WHERE transaction_hash = {hash}")
-            rows = cursor.fetchall()
-            return [UTXO.from_db_row(row) for row in rows]
-
-    def fetch_by_owner(self, verification_key: bytes, unused: bool = False):
-        with sqlite3.connect(self.path) as conn:
-            cursor = conn.cursor()
-            if unused:
-                cursor.execute(
-                    "SELECT * FROM utxos WHERE verification_key = ? AND spender_transaction_uid = -1",
-                    verification_key,
-                )
-            else:
-                cursor.execute(
-                    "SELECT * FROM utxos WHERE verification_key = ?",
-                    verification_key,
-                )
-
-            rows = cursor.fetchall()
-            return [UTXO.from_db_row(row) for row in rows]
-
-    def fetch_by_uid(self, uid: int):
-        with sqlite3.connect(self.path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(f"SELECT * FROM utxos WHERE uid = {uid}")
-            row = cursor.fetchone()
-            if row:
-                return UTXO.from_db_row(row)
-            return None
+from .mempool import Mempool
+from .utxo_set import UTXOSet
 
 
 class SanchainCore:
@@ -252,6 +90,25 @@ class SanchainCore:
         """Fetches the account balance from the UTXO set."""
         utxos = self.utxo_set.fetch_by_owner(verification_key, unused=True)
         return sum([utxo.value for utxo in utxos])
+
+    def create_block(self, transactions: list[Transaction] | None = None):
+        """Creates a new block with the transactions.
+        By default, it will fetch the transactions from the mempool using Mempool().read_transactions"""
+        if not transactions:
+            transactions = self.mempool.read_transactions()
+        return Block.new(transactions, self.config)
+
+    def free_transaction_utxos(self, transaction: Transaction):
+        """Frees the UTXOs of the transaction in the UTXO set.
+        This is to be done when a transaction is invalid but some UTXOs have 
+        been committed to it."""
+
+        with sqlite3.connect(self.path) as conn:
+            cursor = conn.cursor()
+            for utxo in transaction.utxos:
+                cursor.execute(
+                    f"UPDATE utxos SET spender_transaction_uid = -1 WHERE uid = {utxo.uid}")
+            conn.commit()
 
     def validate_utxo(self, utxo: UTXO):
         """Backtracks the UTXO to its origin and validates it."""
