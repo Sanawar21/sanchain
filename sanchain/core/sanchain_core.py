@@ -248,6 +248,11 @@ class SanchainCore:
             )
             conn.commit()
 
+    def get_account_balance(self, verification_key: bytes):
+        """Fetches the account balance from the UTXO set."""
+        utxos = self.utxo_set.fetch_by_owner(verification_key, unused=True)
+        return sum([utxo.value for utxo in utxos])
+
     def validate_utxo(self, utxo: UTXO):
         """Backtracks the UTXO to its origin and validates it."""
         # fetch transaction by id in the UTXO set
